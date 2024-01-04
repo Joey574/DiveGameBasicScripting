@@ -11,6 +11,7 @@ public class MainValues : MonoBehaviour
 
     [Header("Environmental")]
     public float depth;
+    public float time;
     public float pressure;
     public float temp;
     public int vis;
@@ -39,7 +40,7 @@ public class MainValues : MonoBehaviour
 
     private float CalculateInertPressureNitrogen(int i)
     {
-        return N2 + (PN2 - N2) * (1 - Mathf.Pow(2, ( (-Time.deltaTime / 60) / COMPARTMENT_HALF_TIME_N[i])));
+        return N2 + (PN2 - N2) * (1 - Mathf.Pow(2, ( (-time) / COMPARTMENT_HALF_TIME_N[i])));
     }
 
     private float CalculateAmbTol(int i)
