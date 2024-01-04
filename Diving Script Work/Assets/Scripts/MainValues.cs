@@ -16,8 +16,13 @@ public class MainValues : MonoBehaviour
     public float O2;
     public float N;
 
+    public float airPressure;
+
     [Header("Gas Buildup")]
     public float absorbedNitrogen;
+
+    public float nitrogenBuildupRate;
+    public float nitrogenDecompressionRate;
 
     private void CalculatePO2()
     {
@@ -34,11 +39,18 @@ public class MainValues : MonoBehaviour
         pressure = 1 + (depth / 10); 
     }
 
+    private void CalculateAbsorbedNitrogen()
+    {
+        absorbedNitrogen += nitrogenBuildupRate - nitrogenDecompressionRate;
+    }
+
     void Update()
     {
         CalculatePressure();
 
         CalculatePO2();
         CalculatePN();
+
+        CalculateAbsorbedNitrogen();
     }
 }
