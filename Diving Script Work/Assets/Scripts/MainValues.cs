@@ -1,5 +1,9 @@
 using System.Linq;
 using UnityEngine;
+using System.Threading.Tasks;
+using System.IO;
+using System.Threading;
+using System.Drawing;
 
 public class MainValues : MonoBehaviour
 {
@@ -30,6 +34,7 @@ public class MainValues : MonoBehaviour
     public float[] CompartmentPressure = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
     public float[] CompartmentAmbTol = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
     public float DecoCeiling;
+    public float DecoDepth;
 
     private void CalculatePressureAndGas()
     {
@@ -50,12 +55,14 @@ public class MainValues : MonoBehaviour
 
     private void CalculateCompartments()
     {
-        for (int i = 0; i < COMPARTMENT_HALF_TIME_N.Length; i++)
-        {
-            CompartmentPressure[i] = CalculateInertPressureNitrogen(i);
-            CompartmentAmbTol[i] = CalculateAmbTol(i);
-            DecoCeiling = CompartmentAmbTol.Max();
-        }
+        Parallel.For(0, COMPARTMENT_HALF_TIME_N.Length, 
+            index => { CompartmentPressure[index] = CalculateInertPressureNitrogen(index); });
+
+        Parallel.For(0, COMPARTMENT_HALF_TIME_N.Length,
+          index => { CompartmentAmbTol[index] = CalculateAmbTol(index); });
+
+        DecoCeiling = CompartmentAmbTol.Max();
+        DecoDepth = (DecoCeiling - 1) * 10;
     }
    
     void Update()
