@@ -67,6 +67,8 @@ public class MainValues : MonoBehaviour
    
     void Update()
     {
+        depth = -transform.position.y;
+
         CalculatePressureAndGas();
         CalculateCompartments();
     }
