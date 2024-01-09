@@ -38,7 +38,7 @@ RenderSettings:
   m_ReflectionIntensity: 1
   m_CustomReflection: {fileID: 0}
   m_Sun: {fileID: 705507994}
-  m_IndirectSpecularColor: {r: 0.18028378, g: 0.22571412, b: 0.30692285, a: 1}
+  m_IndirectSpecularColor: {r: 0.18028352, g: 0.22571376, b: 0.3069224, a: 1}
   m_UseRadianceAmbientProbe: 0
 --- !u!157 &3
 LightmapSettings:
@@ -345,71 +345,4 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: bf971c4ab41973e468761702824651c1, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  depth: 0
-  time: 0
-  pressure: 0
-  temp: 0
-  vis: 0
-  PlanetATMSeaLevel: 1
-  boyancy: 0
-  lungs: 0
-  noStop: 0
-  PSI: 3000
-  O2: 0.21
-  N2: 0.79
-  PO2: 0
-  PN2: 0
-  CompartmentPressure:
-  - 0
-  - 0
-  - 0
-  - 0
-  - 0
-  - 0
-  - 0
-  - 0
-  - 0
-  - 0
-  - 0
-  - 0
-  - 0
-  - 0
-  - 0
-  - 0
-  CompartmentAmbTol:
-  - 0
-  - 0
-  - 0
-  - 0
-  - 0
-  - 0
-  - 0
-  - 0
-  - 0
-  - 0
-  - 0
-  - 0
-  - 0
-  - 0
-  - 0
-  - 0
-  CompartmentNoStop:
-  - 0
-  - 0
-  - 0
-  - 0
-  - 0
-  - 0
-  - 0
-  - 0
-  - 0
-  - 0
-  - 0
-  - 0
-  - 0
-  - 0
-  - 0
-  - 0
-  NDL: 0
-  DecoCeiling: 0
-  DecoDepth: 0
+  deco: {fileID: 0}
