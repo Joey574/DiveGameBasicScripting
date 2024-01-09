@@ -64,7 +64,10 @@ public class MainValues : MonoBehaviour
     private float CalculateInertPressure(float ht)
     {
         return N2 + (PN2 - N2) * (1 - Mathf.Pow((float)Math.E, ( (-time) / ht)));
+
+        //return (pio) + c * (time - (1/COMPARTMENT_HALF_TIME_N[i])) - ((pio) - N2 - (c/COMPARTMENT_HALF_TIME_N[i]) * Mathf.Pow(Math.E, -COMPARTMENT_HALF_TIME_N[i] * time)
     }
+
 
     private float CalculateAmbTol(int i, float a, float b)
     {
