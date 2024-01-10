@@ -6,58 +6,58 @@ using UnityEngine;
 public class DiveComputer : MonoBehaviour
 {
     [Header("Constants")]
-    const float PH2O = 0.627f;
-    const float PCO2 = 0.5296f;
-    const float MSWtoATMConversion = 10.1325f;
-    const float MSWtoFSWConversion = 3.25684678f;
-    const float Rq = 0.9f;
+    private const float PH2O = 0.627f;
+    private const float PCO2 = 0.5296f;
+    private const float MSWtoATMConversion = 10.1325f;
+    private const float MSWtoFSWConversion = 3.25684678f;
+    private const float Rq = 0.9f;
 
-    static readonly float[] COMPARTMENT_HALF_TIME_N = { 4, 8, 12.5f, 18.5f, 27, 38.3f, 54.3f, 77, 109, 146, 187, 239, 305, 390, 498, 635 };
-    static readonly float[] COMPARTMENT_A_N = { 11.696f, 10.0f, 8.618f, 7.562f, 6.667f, 5.6f, 4.947f, 4.5f, 4.187f, 3.798f, 3.497f, 3.223f, 2.85f, 2.737f, 2.523f, 2.327f };
-    static readonly float[] COMPARTMENT_B_N = { 0.5578f, 0.6514f, 0.7222f, 0.7825f, 0.8126f, 0.8434f, 0.8693f, 0.8910f, 0.9092f, 0.9222f, 0.9319f, 0.9403f, 0.9477f, 0.9544f, 0.9602f, 0.9653f };
+    private static readonly float[] COMPARTMENT_HALF_TIME_N = { 4, 8, 12.5f, 18.5f, 27, 38.3f, 54.3f, 77, 109, 146, 187, 239, 305, 390, 498, 635 };
+    private static readonly float[] COMPARTMENT_A_N = { 11.696f, 10.0f, 8.618f, 7.562f, 6.667f, 5.6f, 4.947f, 4.5f, 4.187f, 3.798f, 3.497f, 3.223f, 2.85f, 2.737f, 2.523f, 2.327f };
+    private static readonly float[] COMPARTMENT_B_N = { 0.5578f, 0.6514f, 0.7222f, 0.7825f, 0.8126f, 0.8434f, 0.8693f, 0.8910f, 0.9092f, 0.9222f, 0.9319f, 0.9403f, 0.9477f, 0.9544f, 0.9602f, 0.9653f };
 
-    static readonly float[] COMPARTMENT_HALF_TIME_H = { 1.51f, 3.02f, 4.72f, 6.99f, 10.21f, 14.48f, 20.53f, 29.11f, 41.2f, 55.19f, 70.69f, 90.34f, 115.29f, 147.42f, 188.24f, 240.03f };
-    static readonly float[] COMPARTMENT_A_H = { 16.189f, 13.83f, 11.919f, 10.458f, 9.22f, 8.205f, 7.305f, 6.502f, 5.95f, 5.545f, 5.333f, 5.189f, 5.181f, 5.176f, 5.172f, 5.119f };
-    static readonly float[] COMPARTMENT_B_H = { 0.477f, 0.5747f, 0.6527f, 0.7223f, 0.7582f, 0.7957f, 0.8279f, 0.8553f, 0.8757f, 0.8903f, 0.8997f, 0.9073f, 0.9122f, 0.9171f, 0.9217f, 0.9267f };
+    private static readonly float[] COMPARTMENT_HALF_TIME_H = { 1.51f, 3.02f, 4.72f, 6.99f, 10.21f, 14.48f, 20.53f, 29.11f, 41.2f, 55.19f, 70.69f, 90.34f, 115.29f, 147.42f, 188.24f, 240.03f };
+    private static readonly float[] COMPARTMENT_A_H = { 16.189f, 13.83f, 11.919f, 10.458f, 9.22f, 8.205f, 7.305f, 6.502f, 5.95f, 5.545f, 5.333f, 5.189f, 5.181f, 5.176f, 5.172f, 5.119f };
+    private static readonly float[] COMPARTMENT_B_H = { 0.477f, 0.5747f, 0.6527f, 0.7223f, 0.7582f, 0.7957f, 0.8279f, 0.8553f, 0.8757f, 0.8903f, 0.8997f, 0.9073f, 0.9122f, 0.9171f, 0.9217f, 0.9267f };
 
-    static readonly float[] COMPARTMENT_MO_N = { 32.4f, 25.4f, 22.5f, 20.3f, 19.0f, 17.5f, 16.5f, 15.7f, 15.2f, 14.6f, 14.2f, 13.9f, 13.4f, 13.2f, 12.9f, 12.7f };
-    static readonly float[] COMPARTMENT_MO_H = { 41.0f, 31.2f, 27.2f, 24.3f, 22.4f, 20.8f, 19.4f, 18.2f, 17.4f, 16.8f, 16.4f, 16.2f, 16.1f, 16.1f, 16.0f, 15.9f };
+    private static readonly float[] COMPARTMENT_MO_N = { 32.4f, 25.4f, 22.5f, 20.3f, 19.0f, 17.5f, 16.5f, 15.7f, 15.2f, 14.6f, 14.2f, 13.9f, 13.4f, 13.2f, 12.9f, 12.7f };
+    private static readonly float[] COMPARTMENT_MO_H = { 41.0f, 31.2f, 27.2f, 24.3f, 22.4f, 20.8f, 19.4f, 18.2f, 17.4f, 16.8f, 16.4f, 16.2f, 16.1f, 16.1f, 16.0f, 15.9f };
+
+    private const float ATMtoMSW = 10.0628f;
 
     [Header("Compartment Values")]
-    public float[] KN2 = new float[16];
-    public float[] KHE = new float[16];
+    private float[] KN2 = new float[16];
+    private float[] KHE = new float[16];
 
-    public float[] NDL_N = new float[16];
-    public float[] NDL_H = new float[16];
+    private float[] NDL_N = new float[16];
+    private float[] NDL_H = new float[16];
 
-    public float NO_STOP;
-    public float PO;
+    private float NO_STOP;
+    private float PO;
 
     [Header("Gas Pressures")]
-    public float[] PN2 = new float[16];
-    public float[] PHE = new float[16];
+    private float[] PN2 = new float[16];
+    private float[] PHE = new float[16];
 
-    public float[] PIG = new float[16];
+    private float[] PIG = new float[16];
 
     [Header("Environmental")]
-    public float SeaLevelPressure = 10; // 10 msw
-    public float ambN2 = 0.79f;
-    public float ambHe = 0.0f;
-    public float ambTemperature;
-
-    public float MeterPerATMAir;
-    public float MeterPerATMWater;
+    private float SeaLevelPressure = 10; // 10 msw
+    private float DEPTH;
 
     [Header("Gas Values")]
-    float N2;
-    float H2;
-    float O2;
+    private DiveTank diveTank;
+    private float N2;
+    private float H2;
+    private float O2;
 
-    [Header("Passed Values")]
-    DiveTank diveTank;
+    [Header("External Scripts")]
+    private DiveComputerDisplay diveComputerDisplay;
 
     private void Awake() 
     {
+        diveComputerDisplay = gameObject.AddComponent<DiveComputerDisplay>();
+
         InitializeKValues();
         InitializeStartInertSat();
     }
@@ -98,7 +98,20 @@ public class DiveComputer : MonoBehaviour
         }
     }
 
-    public float InertSat(float inertGas, float PAMB)
+    public void WriteToDisplay()
+    {
+        diveComputerDisplay.NO_STOP = NO_STOP;
+        diveComputerDisplay.O2 = O2;
+        diveComputerDisplay.DEPTH_MSW = DEPTH;
+        diveComputerDisplay.MAX_DEPTH_MSW = PO2_DEPTH_LIMIT();
+    }
+
+    private float PO2_DEPTH_LIMIT()
+    {
+        return (1.6f / O2) * ATMtoMSW;
+    }
+
+    private float InertSat(float inertGas, float PAMB)
     {
         return (PAMB - PH2O) * inertGas;
     }
@@ -167,23 +180,5 @@ public class DiveComputer : MonoBehaviour
         }
 
         NO_STOP = NDL_N.Min();
-
-        if (H2 > 0.001f)
-        {
-            PI = InspiredPressure(H2, PAMB);
-
-            for (int i = 0; i < 16; i++)
-            {
-                if ((COMPARTMENT_MO_H[i] > PI && PI < PO) || (COMPARTMENT_MO_H[i] < PI && PI > PO))
-                {
-                    NDL_H[i] = (-1.0f / KHE[i]) * Mathf.Log((PI - COMPARTMENT_MO_H[i]) / (PI - PO));
-                }
-                else
-                {
-                    NDL_H[i] = float.MaxValue;
-                }
-            }
-            NO_STOP = Mathf.Min(NO_STOP, NDL_H.Min());
-        }
     }
 }
