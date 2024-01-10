@@ -1,8 +1,9 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 
-public class DecoCalculations : MonoBehaviour
+public class DiveComputer : MonoBehaviour
 {
     [Header("Constants")]
     float PH2O = 0.627f;
@@ -19,23 +20,30 @@ public class DecoCalculations : MonoBehaviour
     static readonly float[] COMPARTMENT_A_H = { 16.189f, 13.83f, 11.919f, 10.458f, 9.22f, 8.205f, 7.305f, 6.502f, 5.95f, 5.545f, 5.333f, 5.189f, 5.181f, 5.176f, 5.172f, 5.119f };
     static readonly float[] COMPARTMENT_B_H = { 0.477f, 0.5747f, 0.6527f, 0.7223f, 0.7582f, 0.7957f, 0.8279f, 0.8553f, 0.8757f, 0.8903f, 0.8997f, 0.9073f, 0.9122f, 0.9171f, 0.9217f, 0.9267f };
 
+    static readonly float[] COMPARTMENT_MO_N = { 32.4f, 25.4f, 22.5f, 20.3f, 19.0f, 17.5f, 16.5f, 15.7f, 15.2f, 14.6f, 14.2f, 13.9f, 13.4f, 13.2f, 12.9f, 12.7f };
+    static readonly float[] COMPARTMENT_MO_H = { 41.0f, 31.2f, 27.2f, 24.3f, 22.4f, 20.8f, 19.4f, 18.2f, 17.4f, 16.8f, 16.4f, 16.2f, 16.1f, 16.1f, 16.0f, 15.9f };
+
     [Header("Compartment Values")]
     public float[] KN2 = new float[16];
     public float[] KHE = new float[16];
 
+    public float[] NDL_N = new float[16];
+    public float[] NDL_H = new float[16];
+
+    public float NO_STOP;
 
     public float PO;
-    public float[] NDL = new float[16];
 
-    [Header("Compartment Status")]
+    [Header("Gas Pressures")]
     public float[] PN2 = new float[16];
     public float[] PHE = new float[16];
 
+    public float[] PIG = new float[16];
+
     [Header("Environmental")]
-    float msw;
     public float SeaLevelPressure = 10; // 10 msw
     public float ambN2 = 0.79f;
-    public float ambHe = 0f;
+    public float ambHe = 0.0f;
     public float ambTemperature;
 
     public float MeterPerATMAir;
@@ -53,9 +61,9 @@ public class DecoCalculations : MonoBehaviour
     {
         this.diveTank = diveTank;
 
-        this.N2 = diveTank.N2;
-        this.O2 = diveTank.N2;
-        this.H2 = diveTank.N2;
+        N2 = diveTank.N2;
+        O2 = diveTank.O2;
+        H2 = diveTank.H2;
 
         InitializeKValues();
         InitializeStartInertSat();
@@ -74,9 +82,9 @@ public class DecoCalculations : MonoBehaviour
     {
         for (int i = 0; i < 16; i++)
         {
-            PN2[i] = InertSat(N2, SeaLevelPressure);
+            PN2[i] = InertSat(ambN2, SeaLevelPressure);
             PO = InertSat(N2, SeaLevelPressure);
-            PHE[i] = InertSat(H2, SeaLevelPressure);
+            PHE[i] = InertSat(ambHe, SeaLevelPressure);
         }
     }
 
@@ -85,27 +93,14 @@ public class DecoCalculations : MonoBehaviour
         return (PAMB - PH2O) * inertGas;
     }
 
-    private float AlveolarVentilation(float inertGas, float pAMB)
-    {
-        return (((PCO2 * (1 - Rq)) / Rq) + pAMB - PH2O) * inertGas;
-    }
-
     private float InspiredPressure(float inertGas, float pAMB)
     {
         return (pAMB - PH2O) * inertGas; 
     }
 
-    private float PartialInertGas(float inertGas, float pAMB)
-    {
-        return (pAMB / MSWtoATMConversion) * inertGas;
-    }
-
     public void VariableDepth(float sDepth, float fDepth, float rate)
     {
         float time = (fDepth - sDepth) / rate;
-
-        float[] PTN2O = PN2; 
-        float[] PTHEO = PHE;
 
         float N2RATE = N2 * rate;
         float HERATE = H2 * rate;
@@ -113,38 +108,72 @@ public class DecoCalculations : MonoBehaviour
         float SAMBP = sDepth + SeaLevelPressure;
         float FAMBP = fDepth + SeaLevelPressure;
 
-        float PIN2O = InspiredPressure(SAMBP, N2);
-        float PIHEO = InspiredPressure(SAMBP, H2);
+        float PIN2O = InspiredPressure(N2, SAMBP);
+        float PIHEO = InspiredPressure(H2, SAMBP);
 
         for (int i = 0; i < 16; i++)
         {
-            PHE[i] = (float)(PIHEO + HERATE * (time - 1.0 / KHE[i]) - (PIHEO - PTHEO[i] - HERATE / KHE[i]) * Mathf.Exp(-KHE[i] * time));
-            PN2[i] = (float)(PIN2O + N2RATE * (time - 1.0 / KN2[i]) - (PIN2O - PTN2O[i] - N2RATE / KN2[i]) * Mathf.Exp(-KN2[i] * time));
+            float PTHEO = PHE[i];
+            float PTN2O = PN2[i];
+
+            PHE[i] = (float)(PIHEO + HERATE * (time - 1.0 / KHE[i]) - (PIHEO - PTHEO - (HERATE / KHE[i])) * Mathf.Exp(-KHE[i] * time));
+            PN2[i] = (float)(PIN2O + N2RATE * (time - 1.0 / KN2[i]) - (PIN2O - PTN2O - (N2RATE / KN2[i])) * Mathf.Exp(-KN2[i] * time));
+
+            PIG[i] = PHE[i] + PN2[i];
         }
     }
 
-    private void ConstantDepth(float depth, float time) 
+    public void ConstantDepth(float depth, float time) 
     {
-        float[] PTN2O = PN2;
-        float[] PTHEO = PHE;
-
-        float PIN2O = InspiredPressure(msw, N2);
-        float PIHEO = InspiredPressure(msw, H2);
+        float PIN2O = InspiredPressure(depth, N2);
+        float PIHEO = InspiredPressure(depth, H2);
 
         for (int i = 0; i < 16; i++)
         {
-            PHE[i] = PTHEO[i] + (PIHEO - PTHEO[i]) * 1.0f - Mathf.Exp(-KHE[i] * time);
-            PN2[i] = PTN2O[i] + (PIN2O - PTN2O[i]) * 1.0f - Mathf.Exp(-KN2[i] * time);
+            float PTHEO = PHE[i];
+            float PTN2O = PN2[i];
+
+            PHE[i] = PTHEO + (PIHEO - PTHEO) * 1.0f - Mathf.Exp(-KHE[i] * time);
+            PN2[i] = PTN2O + (PIN2O - PTN2O) * 1.0f - Mathf.Exp(-KN2[i] * time);
         }
     }
 
-    public void NDLTime()
+    public void NDLTime(float depth)
     {
-        float PI = InspiredPressure(N2, msw);
+        float PAMB = depth + SeaLevelPressure;
+
+        float PI = InspiredPressure(N2, PAMB);
 
         for (int i = 0; i < 16; i++) 
         {
-            NDL[i] = (-1 / KN2[i]) * Mathf.Log((PI - Mo) / (PI - PO));
+            if ((COMPARTMENT_MO_N[i] > PI && PI < PO) || (COMPARTMENT_MO_N[i] < PI && PI > PO))
+            {
+                NDL_N[i] = (-1.0f / KN2[i]) * Mathf.Log((PI - COMPARTMENT_MO_N[i]) / (PI - PO));
+            } 
+            else
+            {
+                NDL_N[i] = float.MaxValue;
+            }
+        }
+
+        NO_STOP = NDL_N.Min();
+
+        if (H2 > 0.001f)
+        {
+            PI = InspiredPressure(H2, PAMB);
+
+            for (int i = 0; i < 16; i++)
+            {
+                if ((COMPARTMENT_MO_H[i] > PI && PI < PO) || (COMPARTMENT_MO_H[i] < PI && PI > PO))
+                {
+                    NDL_H[i] = (-1.0f / KHE[i]) * Mathf.Log((PI - COMPARTMENT_MO_H[i]) / (PI - PO));
+                }
+                else
+                {
+                    NDL_H[i] = float.MaxValue;
+                }
+            }
+            NO_STOP = Mathf.Min(NO_STOP, NDL_H.Min());
         }
     }
 }
