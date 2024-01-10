@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
@@ -36,20 +37,29 @@ public class DiveComputer : MonoBehaviour
     private float PO;
 
     [Header("Gas Pressures")]
-    private float[] PN2 = new float[16];
+    private List<DiveSegment> diveSegments = new List<DiveSegment>();
+    public float[] PN2 = new float[16];
     private float[] PHE = new float[16];
-
     private float[] PIG = new float[16];
 
     [Header("Environmental")]
     private float SeaLevelPressure = 10; // 10 msw
-    private float DEPTH;
 
     [Header("Gas Values")]
     private DiveTank diveTank;
-    private float N2;
+    private float O2 = 0.21f;
+    private float N2 = 0.79f;
     private float H2;
-    private float O2;
+
+    [Header("Adjustments")]
+    public float frequency = 3.0f;
+    public float DEPTH_DEAD_ZONE = 0.25f;
+
+    [Header("Internal Values")]
+    private float IDLE_TIME = 0.0f;
+    private float DEPTH;
+    private float SDEPTH = 0.0f;
+    private float FDEPTH = 0.0f;
 
     [Header("External Scripts")]
     private DiveComputerDisplay diveComputerDisplay;
@@ -60,6 +70,34 @@ public class DiveComputer : MonoBehaviour
 
         InitializeKValues();
         InitializeStartInertSat();
+
+        SDEPTH = -transform.position.y;
+    }
+
+    private void Update()
+    {
+        IDLE_TIME += Time.deltaTime;
+        DEPTH = -transform.position.y;
+
+        if (IDLE_TIME > frequency)
+        {
+            FDEPTH = DEPTH;
+
+            if (SDEPTH <= FDEPTH + DEPTH_DEAD_ZONE && SDEPTH >= FDEPTH - DEPTH_DEAD_ZONE)
+            {
+                float AVGDPTH = (SDEPTH + FDEPTH) / 2;
+                ConstantDepth(AVGDPTH, (IDLE_TIME / 60.0f));
+            }
+            else
+            {
+                float RATE = (FDEPTH - SDEPTH) / (IDLE_TIME / 60.0f);
+                VariableDepth(SDEPTH, FDEPTH, RATE, (IDLE_TIME / 60.0f));
+                SDEPTH = DEPTH;
+            }
+            IDLE_TIME = 0.0f;
+        }
+        NDLTime(DEPTH);
+        WriteToDisplay();
     }
 
     public void SetBreathingMixture(DiveTank diveTank)
@@ -79,7 +117,7 @@ public class DiveComputer : MonoBehaviour
         this.H2 = H2;
     }
 
-    public void InitializeKValues()
+    private void InitializeKValues()
     {
         for (int i = 0; i < 16; i++)
         {
@@ -98,7 +136,7 @@ public class DiveComputer : MonoBehaviour
         }
     }
 
-    public void WriteToDisplay()
+    private void WriteToDisplay()
     {
         diveComputerDisplay.NO_STOP = NO_STOP;
         diveComputerDisplay.O2 = O2;
@@ -121,10 +159,8 @@ public class DiveComputer : MonoBehaviour
         return (pAMB - PH2O) * inertGas; 
     }
 
-    public void VariableDepth(float sDepth, float fDepth, float rate)
+    private void VariableDepth(float sDepth, float fDepth, float rate, float time)
     {
-        float time = (fDepth - sDepth) / rate;
-
         float N2RATE = N2 * rate;
         float HERATE = H2 * rate;
 
@@ -146,7 +182,7 @@ public class DiveComputer : MonoBehaviour
         }
     }
 
-    public void ConstantDepth(float depth, float time) 
+    private void ConstantDepth(float depth, float time) 
     {
         float PIN2O = InspiredPressure(depth, N2);
         float PIHEO = InspiredPressure(depth, H2);
@@ -156,12 +192,12 @@ public class DiveComputer : MonoBehaviour
             float PTHEO = PHE[i];
             float PTN2O = PN2[i];
 
-            PHE[i] = PTHEO + (PIHEO - PTHEO) * 1.0f - Mathf.Exp(-KHE[i] * time);
-            PN2[i] = PTN2O + (PIN2O - PTN2O) * 1.0f - Mathf.Exp(-KN2[i] * time);
+            PHE[i] = PTHEO + (PIHEO - PTHEO) * (1.0f - Mathf.Exp(-KHE[i] * time));
+            PN2[i] = PTN2O + (PIN2O - PTN2O) * (1.0f - Mathf.Exp(-KN2[i] * time));
         }
     }
 
-    public void NDLTime(float depth)
+    private void NDLTime(float depth)
     {
         float PAMB = depth + SeaLevelPressure;
 
@@ -178,7 +214,6 @@ public class DiveComputer : MonoBehaviour
                 NDL_N[i] = float.MaxValue;
             }
         }
-
         NO_STOP = NDL_N.Min();
     }
 }
