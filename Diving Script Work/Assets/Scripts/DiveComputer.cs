@@ -6,11 +6,11 @@ using UnityEngine;
 public class DiveComputer : MonoBehaviour
 {
     [Header("Constants")]
-    float PH2O = 0.627f;
-    float PCO2 = 0.5296f;
-    float MSWtoATMConversion = 10.1325f;
-    float MSWtoFSWConversion = 3.25684678f;
-    float Rq = 0.9f;
+    const float PH2O = 0.627f;
+    const float PCO2 = 0.5296f;
+    const float MSWtoATMConversion = 10.1325f;
+    const float MSWtoFSWConversion = 3.25684678f;
+    const float Rq = 0.9f;
 
     static readonly float[] COMPARTMENT_HALF_TIME_N = { 4, 8, 12.5f, 18.5f, 27, 38.3f, 54.3f, 77, 109, 146, 187, 239, 305, 390, 498, 635 };
     static readonly float[] COMPARTMENT_A_N = { 11.696f, 10.0f, 8.618f, 7.562f, 6.667f, 5.6f, 4.947f, 4.5f, 4.187f, 3.798f, 3.497f, 3.223f, 2.85f, 2.737f, 2.523f, 2.327f };
@@ -31,7 +31,6 @@ public class DiveComputer : MonoBehaviour
     public float[] NDL_H = new float[16];
 
     public float NO_STOP;
-
     public float PO;
 
     [Header("Gas Pressures")]
@@ -57,16 +56,27 @@ public class DiveComputer : MonoBehaviour
     [Header("Passed Values")]
     DiveTank diveTank;
 
-    public void SetValues(DiveTank diveTank) 
+    private void Awake() 
+    {
+        InitializeKValues();
+        InitializeStartInertSat();
+    }
+
+    public void SetBreathingMixture(DiveTank diveTank)
     {
         this.diveTank = diveTank;
 
         N2 = diveTank.N2;
         O2 = diveTank.O2;
         H2 = diveTank.H2;
+    }
 
-        InitializeKValues();
-        InitializeStartInertSat();
+    public void SetBreathingMixture(float O2, float N2, float H2)
+    {
+        diveTank = null;
+        this.O2 = O2;
+        this.N2 = N2;
+        this.H2 = H2;
     }
 
     public void InitializeKValues()
@@ -82,9 +92,9 @@ public class DiveComputer : MonoBehaviour
     {
         for (int i = 0; i < 16; i++)
         {
-            PN2[i] = InertSat(ambN2, SeaLevelPressure);
-            PO = InertSat(N2, SeaLevelPressure);
-            PHE[i] = InertSat(ambHe, SeaLevelPressure);
+            PN2[i] = InertSat(0.79f, SeaLevelPressure);
+            PO = InertSat(0.79f, SeaLevelPressure);
+            PHE[i] = InertSat(0.0f, SeaLevelPressure);
         }
     }
 

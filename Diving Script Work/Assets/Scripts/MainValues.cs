@@ -14,7 +14,7 @@ public class MainValues : MonoBehaviour
         if (deco == null )
         {
             deco = gameObject.AddComponent<DiveComputer>();
-            deco.SetValues(diveTank);
+            deco.SetBreathingMixture(diveTank);
         }
 
         //deco.VariableDepth(0, (120 / 3.25684678f), (60 / 3.25684678f));
