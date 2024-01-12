@@ -31,9 +31,7 @@ public class DiveComputer : MonoBehaviour
 
     [Header("Compartment Values")]
     public float[] PN2 = new float[16];
-    public float[] PN2_CHANGE = new float[16];
     private float[] PHE = new float[16];
-    private float[] PHE_CHANGE = new float[16];
     private float[] PIG = new float[16];
 
     private float[] KN2 = new float[16];
@@ -42,7 +40,14 @@ public class DiveComputer : MonoBehaviour
     private float[] NDL_N = new float[16];
     private float[] NDL_H = new float[16];
 
+    private float[] N2_AMBTOL = new float[16];
+    private float[] HE_AMBTOL = new float[16];
+
     private float[] PO = new float[16];
+
+    [Header("Limits")]
+    private float N2_AMBTOL_LIMIT;
+    private float HE_AMBTOL_LIMIT;
 
     private float NO_STOP;
 
@@ -67,7 +72,6 @@ public class DiveComputer : MonoBehaviour
     private float IDLE_TIME = 0.0f;
     private float DEPTH;
     private float SDEPTH = 0.0f;
-    private float FDEPTH = 0.0f;
 
     [Header("External Scripts")]
     private DiveComputerDisplay diveComputerDisplay;
@@ -96,21 +100,32 @@ public class DiveComputer : MonoBehaviour
 
         if (IDLE_TIME > frequency)
         {
-            FDEPTH = DEPTH;
             float TIME_MIN = IDLE_TIME / 60.0f;
 
-            if (SDEPTH <= FDEPTH + DEPTH_DEAD_ZONE && SDEPTH >= FDEPTH - DEPTH_DEAD_ZONE)
+            if (SDEPTH <= DEPTH + DEPTH_DEAD_ZONE && SDEPTH >= DEPTH - DEPTH_DEAD_ZONE)
             {
-                float AVGDPTH = (SDEPTH + FDEPTH) / 2;
+                float AVGDPTH = (SDEPTH + DEPTH) / 2;
                 ConstantDepth(AVGDPTH, TIME_MIN);
             }
             else
             {
-                float RATE = (FDEPTH - SDEPTH) / TIME_MIN;
-                VariableDepth(SDEPTH, FDEPTH, RATE, TIME_MIN);
+                float RATE = (DEPTH - SDEPTH) / TIME_MIN;
+                VariableDepth(SDEPTH, DEPTH, RATE, TIME_MIN);
                 SDEPTH = DEPTH;
             }
             IDLE_TIME = 0.0f;
+
+            Parallel.For(0, 16, i =>
+            {
+                N2_AMBTOL[i] = PAMBTOL_N(i);
+            });
+            N2_AMBTOL_LIMIT = N2_AMBTOL.Max();
+
+            Parallel.For(0, 16, i =>
+            {
+                HE_AMBTOL[i] = PAMBTOL_H(i);
+            });
+            HE_AMBTOL_LIMIT = HE_AMBTOL.Max();
 
             if (symptomCalculator.SufferingCNSToxicity(O2, DEPTH / ATMtoMSWConversion))
             {
@@ -199,11 +214,8 @@ public class DiveComputer : MonoBehaviour
 
         Parallel.For(0, 16, i =>
         {
-            PHE_CHANGE[i] = (float)(PIHEO + HERATE * (time - (1.0f / KHE[i])) - (PIHEO - PHE_CHANGE[i] - (HERATE / KHE[i])) * Mathf.Exp(-KHE[i] * time));
-            PN2_CHANGE[i] = (float)(PIN2O + N2RATE * (time - (1.0f / KN2[i])) - (PIN2O - PN2_CHANGE[i] - (N2RATE / KN2[i])) * Mathf.Exp(-KN2[i] * time));
-
-            PHE[i] += PHE_CHANGE[i];
-            PN2[i] += PN2_CHANGE[i];
+            PHE[i] = (float)(PIHEO + HERATE * (time - (1.0f / KHE[i])) - (PIHEO - PHE[i] - (HERATE / KHE[i])) * Mathf.Exp(-KHE[i] * time));
+            PN2[i] = (float)(PIN2O + N2RATE * (time - (1.0f / KN2[i])) - (PIN2O - PN2[i] - (N2RATE / KN2[i])) * Mathf.Exp(-KN2[i] * time));
 
             PIG[i] = PHE[i] + PN2[i];
         });
@@ -216,12 +228,18 @@ public class DiveComputer : MonoBehaviour
 
         Parallel.For(0, 16, i =>
         {
-            PHE_CHANGE[i] = PHE_CHANGE[i] + (PIHEO - PHE_CHANGE[i]) * (1.0f - Mathf.Exp(-KHE[i] * time));
-            PN2_CHANGE[i] = PN2_CHANGE[i] + (PIN2O - PN2_CHANGE[i]) * (1.0f - Mathf.Exp(-KN2[i] * time));
-
-            PHE[i] += PHE_CHANGE[i];
-            PN2[i] += PN2_CHANGE[i];
+            PHE[i] = PHE[i] + (PIHEO - PHE[i]) * (1.0f - Mathf.Exp(-KHE[i] * time));
+            PN2[i] = PN2[i] + (PIN2O - PN2[i]) * (1.0f - Mathf.Exp(-KN2[i] * time));
         });
+    }
+
+    private float PAMBTOL_N(int i)
+    {
+        return (PN2[i] - COMPARTMENT_A_N[i]) * COMPARTMENT_B_N[i];
+    }
+    private float PAMBTOL_H(int i)
+    {
+        return (PHE[i] - COMPARTMENT_A_H[i]) * COMPARTMENT_B_H[i];
     }
 
     private void NDLTime_N(float depth)
