@@ -30,20 +30,24 @@ public class DiveComputer : MonoBehaviour
     private static readonly float[] COMPARTMENT_MO_H = { 41.0f, 31.2f, 27.2f, 24.3f, 22.4f, 20.8f, 19.4f, 18.2f, 17.4f, 16.8f, 16.4f, 16.2f, 16.1f, 16.1f, 16.0f, 15.9f };
 
     [Header("Compartment Values")]
+    public float[] PN2 = new float[16];
+    public float[] PN2_CHANGE = new float[16];
+    private float[] PHE = new float[16];
+    private float[] PHE_CHANGE = new float[16];
+    private float[] PIG = new float[16];
+
     private float[] KN2 = new float[16];
     private float[] KHE = new float[16];
 
     private float[] NDL_N = new float[16];
     private float[] NDL_H = new float[16];
 
-    private float NO_STOP;
-    private float PO;
+    private float[] PO = new float[16];
 
-    [Header("Gas Pressures")]
-    private List<DiveSegment> diveSegments = new List<DiveSegment>();
-    public float[] PN2 = new float[16];
-    private float[] PHE = new float[16];
-    private float[] PIG = new float[16];
+    private float NO_STOP;
+
+    [Header("Dive Profile")]
+    private List<DiveSegment> diveSegments = new List<DiveSegment>();   
 
     [Header("Environmental")]
     private float SeaLevelPressure = 10; // 10 msw
@@ -52,7 +56,7 @@ public class DiveComputer : MonoBehaviour
     private DiveTank diveTank;
     private float O2 = 0.21f;
     private float N2 = 0.79f;
-    private float H2;
+    private float H2 = 0.0f;
 
     [Header("Adjustments")]
     public float frequency = 3.0f;
@@ -93,16 +97,17 @@ public class DiveComputer : MonoBehaviour
         if (IDLE_TIME > frequency)
         {
             FDEPTH = DEPTH;
+            float TIME_MIN = IDLE_TIME / 60.0f;
 
             if (SDEPTH <= FDEPTH + DEPTH_DEAD_ZONE && SDEPTH >= FDEPTH - DEPTH_DEAD_ZONE)
             {
                 float AVGDPTH = (SDEPTH + FDEPTH) / 2;
-                ConstantDepth(AVGDPTH, (IDLE_TIME / 60.0f));
+                ConstantDepth(AVGDPTH, TIME_MIN);
             }
             else
             {
-                float RATE = (FDEPTH - SDEPTH) / (IDLE_TIME / 60.0f);
-                VariableDepth(SDEPTH, FDEPTH, RATE, (IDLE_TIME / 60.0f));
+                float RATE = (FDEPTH - SDEPTH) / TIME_MIN;
+                VariableDepth(SDEPTH, FDEPTH, RATE, TIME_MIN);
                 SDEPTH = DEPTH;
             }
             IDLE_TIME = 0.0f;
@@ -144,12 +149,11 @@ public class DiveComputer : MonoBehaviour
 
     private void InitializeStartInertSat()
     {
-        PO = InertSat(0.79f, 10); // 10 -> normal pressure  0.79 -> normal fn2
-
         Parallel.For(0, 16, i =>
         {
-            PN2[i] = InertSat(0.79f, 10); // 10 -> normal pressure  0.79 -> normal fn2
-            PHE[i] = InertSat(0.0f, 10); // 10 -> normal pressure  0.0 -> normal fhe
+            PO[i] = InertSat(0.79f, 10f); // 10 -> normal air pressure  0.79 -> normal fn2
+            PN2[i] = InertSat(0.79f, 10); // 10 -> normal air pressure  0.79 -> normal fn2
+            PHE[i] = InertSat(0.0f, 10); // 10 -> normal air pressure  0.0 -> normal fhe
         });
     }
 
@@ -182,7 +186,7 @@ public class DiveComputer : MonoBehaviour
         return (pAMB - PH2O) * inertGas; 
     }
 
-    public void VariableDepth(float sDepth, float fDepth, float rate, float time)
+    private void VariableDepth(float sDepth, float fDepth, float rate, float time)
     {
         float N2RATE = N2 * rate;
         float HERATE = H2 * rate;
@@ -195,8 +199,11 @@ public class DiveComputer : MonoBehaviour
 
         Parallel.For(0, 16, i =>
         {
-            PHE[i] = (float)(PIHEO + HERATE * (time - 1.0f / KHE[i]) - (PIHEO - PHE[i] - (HERATE / KHE[i])) * Mathf.Exp(-KHE[i] * time));
-            PN2[i] = (float)(PIN2O + N2RATE * (time - 1.0f / KN2[i]) - (PIN2O - PN2[i] - (N2RATE / KN2[i])) * Mathf.Exp(-KN2[i] * time));
+            PHE_CHANGE[i] = (float)(PIHEO + HERATE * (time - (1.0f / KHE[i])) - (PIHEO - PHE_CHANGE[i] - (HERATE / KHE[i])) * Mathf.Exp(-KHE[i] * time));
+            PN2_CHANGE[i] = (float)(PIN2O + N2RATE * (time - (1.0f / KN2[i])) - (PIN2O - PN2_CHANGE[i] - (N2RATE / KN2[i])) * Mathf.Exp(-KN2[i] * time));
+
+            PHE[i] += PHE_CHANGE[i];
+            PN2[i] += PN2_CHANGE[i];
 
             PIG[i] = PHE[i] + PN2[i];
         });
@@ -209,8 +216,11 @@ public class DiveComputer : MonoBehaviour
 
         Parallel.For(0, 16, i =>
         {
-            PHE[i] = PHE[i] + (PIHEO - PHE[i]) * (1.0f - Mathf.Exp(-KHE[i] * time));
-            PN2[i] = PN2[i] + (PIN2O - PN2[i]) * (1.0f - Mathf.Exp(-KN2[i] * time));
+            PHE_CHANGE[i] = PHE_CHANGE[i] + (PIHEO - PHE_CHANGE[i]) * (1.0f - Mathf.Exp(-KHE[i] * time));
+            PN2_CHANGE[i] = PN2_CHANGE[i] + (PIN2O - PN2_CHANGE[i]) * (1.0f - Mathf.Exp(-KN2[i] * time));
+
+            PHE[i] += PHE_CHANGE[i];
+            PN2[i] += PN2_CHANGE[i];
         });
     }
 
@@ -221,10 +231,10 @@ public class DiveComputer : MonoBehaviour
 
         Parallel.For(0, 16, i =>
         {
-            if ((COMPARTMENT_MO_N[i] > PI && PI < PO) || (COMPARTMENT_MO_N[i] < PI && PI > PO))
+            if ((COMPARTMENT_MO_N[i] > PI && PI < PO[i]) || (COMPARTMENT_MO_N[i] < PI && PI > PO[i]))
             {
-                NDL_N[i] = (-1.0f / KN2[i]) * Mathf.Log((PI - COMPARTMENT_MO_N[i]) / (PI - PO));
-                PO = PN2[i];
+                NDL_N[i] = (-1.0f / KN2[i]) * Mathf.Log((PI - COMPARTMENT_MO_N[i]) / (PI - PO[i]));
+                PO[i] = PN2[i];
             }
             else
             {
