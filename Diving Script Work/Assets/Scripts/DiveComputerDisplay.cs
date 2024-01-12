@@ -8,5 +8,6 @@ public class DiveComputerDisplay : MonoBehaviour
     public float NO_STOP;
     public float DEPTH_MSW;
     public float MAX_DEPTH_MSW;
+    public float MAX_DEPTH_FSW;
     public float O2;
 }

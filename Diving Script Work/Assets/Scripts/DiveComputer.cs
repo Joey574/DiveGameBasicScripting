@@ -3,14 +3,19 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
+using System.Threading;
+using System.Threading.Tasks;
 
 public class DiveComputer : MonoBehaviour
 {
+    [Header("Conversion Constants")]
+    private const float ATMtoMSWConversion = 10.0628f;
+    private const float ATMtoFSWConversion = 33.066f;
+    private const float MSWtoFSWConversion = 3.286f;
+
     [Header("Constants")]
     private const float PH2O = 0.627f;
     private const float PCO2 = 0.5296f;
-    private const float MSWtoATMConversion = 10.1325f;
-    private const float MSWtoFSWConversion = 3.25684678f;
     private const float Rq = 0.9f;
 
     private static readonly float[] COMPARTMENT_HALF_TIME_N = { 4, 8, 12.5f, 18.5f, 27, 38.3f, 54.3f, 77, 109, 146, 187, 239, 305, 390, 498, 635 };
@@ -23,8 +28,6 @@ public class DiveComputer : MonoBehaviour
 
     private static readonly float[] COMPARTMENT_MO_N = { 32.4f, 25.4f, 22.5f, 20.3f, 19.0f, 17.5f, 16.5f, 15.7f, 15.2f, 14.6f, 14.2f, 13.9f, 13.4f, 13.2f, 12.9f, 12.7f };
     private static readonly float[] COMPARTMENT_MO_H = { 41.0f, 31.2f, 27.2f, 24.3f, 22.4f, 20.8f, 19.4f, 18.2f, 17.4f, 16.8f, 16.4f, 16.2f, 16.1f, 16.1f, 16.0f, 15.9f };
-
-    private const float ATMtoMSW = 10.0628f;
 
     [Header("Compartment Values")]
     private float[] KN2 = new float[16];
@@ -53,6 +56,7 @@ public class DiveComputer : MonoBehaviour
 
     [Header("Adjustments")]
     public float frequency = 3.0f;
+    public float PO2_WARNING = 1.4f;
     public float DEPTH_DEAD_ZONE = 0.25f;
 
     [Header("Internal Values")]
@@ -63,10 +67,12 @@ public class DiveComputer : MonoBehaviour
 
     [Header("External Scripts")]
     private DiveComputerDisplay diveComputerDisplay;
+    private SymptomCalculator symptomCalculator;
 
     private void Awake() 
     {
         diveComputerDisplay = gameObject.AddComponent<DiveComputerDisplay>();
+        symptomCalculator = new SymptomCalculator();
 
         InitializeKValues();
         InitializeStartInertSat();
@@ -78,6 +84,11 @@ public class DiveComputer : MonoBehaviour
     {
         IDLE_TIME += Time.deltaTime;
         DEPTH = -transform.position.y;
+
+        if (O2 * (DEPTH / ATMtoMSWConversion) > PO2_WARNING)
+        {
+            Debug.Log("WARNING");
+        }
 
         if (IDLE_TIME > frequency)
         {
@@ -95,8 +106,13 @@ public class DiveComputer : MonoBehaviour
                 SDEPTH = DEPTH;
             }
             IDLE_TIME = 0.0f;
+
+            if (symptomCalculator.SufferingCNSToxicity(O2, DEPTH / ATMtoMSWConversion))
+            {
+                Debug.Log("CNS");
+            }
         }
-        NDLTime(DEPTH);
+        NDLTime_N(DEPTH);
         WriteToDisplay();
     }
 
@@ -119,21 +135,22 @@ public class DiveComputer : MonoBehaviour
 
     private void InitializeKValues()
     {
-        for (int i = 0; i < 16; i++)
+        Parallel.For(0, 16, i =>
         {
             KN2[i] = Mathf.Log(2) / COMPARTMENT_HALF_TIME_N[i];
             KHE[i] = Mathf.Log(2) / COMPARTMENT_HALF_TIME_H[i];
-        }
+        });
     }
 
     private void InitializeStartInertSat()
     {
-        for (int i = 0; i < 16; i++)
+        PO = InertSat(0.79f, 10); // 10 -> normal pressure  0.79 -> normal fn2
+
+        Parallel.For(0, 16, i =>
         {
-            PN2[i] = InertSat(0.79f, SeaLevelPressure);
-            PO = InertSat(0.79f, SeaLevelPressure);
-            PHE[i] = InertSat(0.0f, SeaLevelPressure);
-        }
+            PN2[i] = InertSat(0.79f, 10); // 10 -> normal pressure  0.79 -> normal fn2
+            PHE[i] = InertSat(0.0f, 10); // 10 -> normal pressure  0.0 -> normal fhe
+        });
     }
 
     private void WriteToDisplay()
@@ -141,12 +158,18 @@ public class DiveComputer : MonoBehaviour
         diveComputerDisplay.NO_STOP = NO_STOP;
         diveComputerDisplay.O2 = O2;
         diveComputerDisplay.DEPTH_MSW = DEPTH;
-        diveComputerDisplay.MAX_DEPTH_MSW = PO2_DEPTH_LIMIT();
+        diveComputerDisplay.MAX_DEPTH_MSW = PO2_DEPTH_LIMIT_MSW(PO2_WARNING);
+        diveComputerDisplay.MAX_DEPTH_FSW = PO2_DEPTH_LIMIT_FSW(PO2_WARNING);
     }
 
-    private float PO2_DEPTH_LIMIT()
+    private float PO2_DEPTH_LIMIT_MSW(float max)
     {
-        return (1.6f / O2) * ATMtoMSW;
+        return (max / O2) * ATMtoMSWConversion;
+    }
+
+    private float PO2_DEPTH_LIMIT_FSW(float max)
+    {
+        return (max / O2) * ATMtoFSWConversion;
     }
 
     private float InertSat(float inertGas, float PAMB)
@@ -159,7 +182,7 @@ public class DiveComputer : MonoBehaviour
         return (pAMB - PH2O) * inertGas; 
     }
 
-    private void VariableDepth(float sDepth, float fDepth, float rate, float time)
+    public void VariableDepth(float sDepth, float fDepth, float rate, float time)
     {
         float N2RATE = N2 * rate;
         float HERATE = H2 * rate;
@@ -170,16 +193,13 @@ public class DiveComputer : MonoBehaviour
         float PIN2O = InspiredPressure(N2, SAMBP);
         float PIHEO = InspiredPressure(H2, SAMBP);
 
-        for (int i = 0; i < 16; i++)
+        Parallel.For(0, 16, i =>
         {
-            float PTHEO = PHE[i];
-            float PTN2O = PN2[i];
-
-            PHE[i] = (float)(PIHEO + HERATE * (time - 1.0 / KHE[i]) - (PIHEO - PTHEO - (HERATE / KHE[i])) * Mathf.Exp(-KHE[i] * time));
-            PN2[i] = (float)(PIN2O + N2RATE * (time - 1.0 / KN2[i]) - (PIN2O - PTN2O - (N2RATE / KN2[i])) * Mathf.Exp(-KN2[i] * time));
+            PHE[i] = (float)(PIHEO + HERATE * (time - 1.0f / KHE[i]) - (PIHEO - PHE[i] - (HERATE / KHE[i])) * Mathf.Exp(-KHE[i] * time));
+            PN2[i] = (float)(PIN2O + N2RATE * (time - 1.0f / KN2[i]) - (PIN2O - PN2[i] - (N2RATE / KN2[i])) * Mathf.Exp(-KN2[i] * time));
 
             PIG[i] = PHE[i] + PN2[i];
-        }
+        });
     }
 
     private void ConstantDepth(float depth, float time) 
@@ -187,33 +207,31 @@ public class DiveComputer : MonoBehaviour
         float PIN2O = InspiredPressure(depth, N2);
         float PIHEO = InspiredPressure(depth, H2);
 
-        for (int i = 0; i < 16; i++)
+        Parallel.For(0, 16, i =>
         {
-            float PTHEO = PHE[i];
-            float PTN2O = PN2[i];
-
-            PHE[i] = PTHEO + (PIHEO - PTHEO) * (1.0f - Mathf.Exp(-KHE[i] * time));
-            PN2[i] = PTN2O + (PIN2O - PTN2O) * (1.0f - Mathf.Exp(-KN2[i] * time));
-        }
+            PHE[i] = PHE[i] + (PIHEO - PHE[i]) * (1.0f - Mathf.Exp(-KHE[i] * time));
+            PN2[i] = PN2[i] + (PIN2O - PN2[i]) * (1.0f - Mathf.Exp(-KN2[i] * time));
+        });
     }
 
-    private void NDLTime(float depth)
+    private void NDLTime_N(float depth)
     {
         float PAMB = depth + SeaLevelPressure;
-
         float PI = InspiredPressure(N2, PAMB);
 
-        for (int i = 0; i < 16; i++) 
+        Parallel.For(0, 16, i =>
         {
             if ((COMPARTMENT_MO_N[i] > PI && PI < PO) || (COMPARTMENT_MO_N[i] < PI && PI > PO))
             {
                 NDL_N[i] = (-1.0f / KN2[i]) * Mathf.Log((PI - COMPARTMENT_MO_N[i]) / (PI - PO));
-            } 
+                PO = PN2[i];
+            }
             else
             {
                 NDL_N[i] = float.MaxValue;
             }
-        }
+        });
+     
         NO_STOP = NDL_N.Min();
     }
 }
