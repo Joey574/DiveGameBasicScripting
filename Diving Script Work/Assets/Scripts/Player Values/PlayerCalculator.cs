@@ -6,7 +6,7 @@ using UnityEngine;
 using System.Threading;
 using System.Threading.Tasks;
 
-public class DiveComputer : MonoBehaviour
+public class PlayerCalculator : MonoBehaviour
 {
     [Header("Conversion Constants")]
     private const float ATMtoMSWConversion = 10.0628f;
@@ -36,7 +36,7 @@ public class DiveComputer : MonoBehaviour
     private float NO_STOP;
 
     [Header("Dive Profile")]
-    private List<DiveSegment> diveSegments = new List<DiveSegment>();   
+    private List<DiveSegment> diveSegments = new List<DiveSegment>();
 
     [Header("Environmental")]
     private float SeaLevelPressure = 10; // 10 msw
@@ -58,10 +58,11 @@ public class DiveComputer : MonoBehaviour
 
     [Header("External Scripts")]
     private DiveComputerDisplay diveComputerDisplay;
+    private SymptomCalculator symptomCalculator;
 
-    private void Awake() 
+    private void Awake()
     {
-        diveComputerDisplay = gameObject.AddComponent<DiveComputerDisplay>();
+        symptomCalculator = new SymptomCalculator();
 
         InitializeKValues();
         InitializeStartInertSat();
@@ -73,11 +74,6 @@ public class DiveComputer : MonoBehaviour
     {
         IDLE_TIME += Time.deltaTime;
         DEPTH = -transform.position.y;
-
-        if (O2 * (DEPTH / ATMtoMSWConversion) > PO2_WARNING)
-        {
-            Debug.Log("WARNING");
-        }
 
         if (IDLE_TIME > frequency)
         {
@@ -100,9 +96,12 @@ public class DiveComputer : MonoBehaviour
                 HE_AMBTOL[i] = PAMBTOL_H(i);
             });
             HE_AMBTOL_LIMIT = HE_AMBTOL.Max();
+
+            if (symptomCalculator.SufferingCNSToxicity(O2, DEPTH / ATMtoMSWConversion))
+            {
+                Debug.Log("CNS");
+            }
         }
-        NDLTime_N(DEPTH);
-        WriteToDisplay();
     }
 
     public void SetBreathingMixture(DiveTank diveTank)
@@ -141,25 +140,6 @@ public class DiveComputer : MonoBehaviour
         });
     }
 
-    private void WriteToDisplay()
-    {
-        diveComputerDisplay.NO_STOP = NO_STOP;
-        diveComputerDisplay.O2 = O2;
-        diveComputerDisplay.DEPTH_MSW = DEPTH;
-        diveComputerDisplay.MAX_DEPTH_MSW = PO2_DEPTH_LIMIT_MSW(PO2_WARNING);
-        diveComputerDisplay.MAX_DEPTH_FSW = PO2_DEPTH_LIMIT_FSW(PO2_WARNING);
-    }
-
-    private float PO2_DEPTH_LIMIT_MSW(float max)
-    {
-        return (max / O2) * ATMtoMSWConversion;
-    }
-
-    private float PO2_DEPTH_LIMIT_FSW(float max)
-    {
-        return (max / O2) * ATMtoFSWConversion;
-    }
-
     private float InertSat(float inertGas, float PAMB)
     {
         return (PAMB - DiveConstants.PH2O) * inertGas;
@@ -167,7 +147,7 @@ public class DiveComputer : MonoBehaviour
 
     private float InspiredPressure(float inertGas, float pAMB)
     {
-        return (pAMB - DiveConstants.PH2O) * inertGas; 
+        return (pAMB - DiveConstants.PH2O) * inertGas;
     }
 
     private void VariableDepth(float sDepth, float fDepth, float rate, float time)
@@ -198,26 +178,5 @@ public class DiveComputer : MonoBehaviour
     private float PAMBTOL_H(int i)
     {
         return (PHE[i] - DiveConstants.COMPARTMENT_A_H[i]) * DiveConstants.COMPARTMENT_B_H[i];
-    }
-
-    private void NDLTime_N(float depth)
-    {
-        float PAMB = depth + SeaLevelPressure;
-        float PI = InspiredPressure(N2, PAMB);
-
-        Parallel.For(0, 16, i =>
-        {
-            if ((DiveConstants.COMPARTMENT_MO_N[i] > PI && PI < PO[i]) || (DiveConstants.COMPARTMENT_MO_N[i] < PI && PI > PO[i]))
-            {
-                NDL_N[i] = (-1.0f / KN2[i]) * Mathf.Log((PI - DiveConstants.COMPARTMENT_MO_N[i]) / (PI - PO[i]));
-                PO[i] = PN2[i];
-            }
-            else
-            {
-                NDL_N[i] = float.MaxValue;
-            }
-        });
-     
-        NO_STOP = NDL_N.Min();
     }
 }
