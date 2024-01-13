@@ -66,7 +66,6 @@ public class DiveComputer : MonoBehaviour
     [Header("Adjustments")]
     public float frequency = 3.0f;
     public float PO2_WARNING = 1.4f;
-    public float DEPTH_DEAD_ZONE = 0.25f;
 
     [Header("Internal Values")]
     private float IDLE_TIME = 0.0f;
@@ -101,18 +100,11 @@ public class DiveComputer : MonoBehaviour
         if (IDLE_TIME > frequency)
         {
             float TIME_MIN = IDLE_TIME / 60.0f;
+            float RATE = (DEPTH - SDEPTH) / TIME_MIN;
 
-            if (SDEPTH <= DEPTH + DEPTH_DEAD_ZONE && SDEPTH >= DEPTH - DEPTH_DEAD_ZONE)
-            {
-                float AVGDPTH = (SDEPTH + DEPTH) / 2;
-                ConstantDepth(AVGDPTH, TIME_MIN);
-            }
-            else
-            {
-                float RATE = (DEPTH - SDEPTH) / TIME_MIN;
-                VariableDepth(SDEPTH, DEPTH, RATE, TIME_MIN);
-                SDEPTH = DEPTH;
-            }
+            VariableDepth(SDEPTH, DEPTH, RATE, TIME_MIN);
+            SDEPTH = DEPTH;
+
             IDLE_TIME = 0.0f;
 
             Parallel.For(0, 16, i =>
