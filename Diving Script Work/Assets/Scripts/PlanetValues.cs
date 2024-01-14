@@ -6,9 +6,6 @@ public class PlanetValues
 {
     [Header("Planet Values")]
     public string PlanetName;
-    public float ambPressure;
-    public float ambTemperature;
-
-    public float MeterPerATMAir;
-    public float MeterPerATMWater;
+    public float SurfacePressure;
+    public float SurfaceTemp;
 }
