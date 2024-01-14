@@ -79,7 +79,7 @@ public class DiveComputer : MonoBehaviour
 
         if (IDLE_TIME > frequency)
         {
-            float TIME_MIN = IDLE_TIME;// / 60.0f;
+            float TIME_MIN = IDLE_TIME / 60.0f;
             float RATE = (DEPTH - SDEPTH) / TIME_MIN;
 
             VariableDepth(SDEPTH, DEPTH, RATE, TIME_MIN);
