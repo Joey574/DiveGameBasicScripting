@@ -14,11 +14,11 @@ public class PlayerCalculator : MonoBehaviour
     private const float MSWtoFSWConversion = 3.286f;
 
     [Header("Compartment Values")]
-    private float[] PN2 = new float[16];
+    public float[] PN2 = new float[16];
     private float[] PHE = new float[16];
     private float[] PIG = new float[16];
 
-    private float[] NDL_N = new float[16];
+    public float[] NDL_N = new float[16];
     private float[] NDL_H = new float[16];
 
     private float[] N2_AMBTOL = new float[16];
